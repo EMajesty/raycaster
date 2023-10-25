@@ -4,7 +4,7 @@
 
 float degToRad(float a)
 {
-    return a * M_PI/180.0;
+    return a * M_PI / 180.0;
 }
 
 float fixAng(float a)
@@ -241,9 +241,9 @@ void drawMap2D()
             yo = y * mapS;
             glBegin(GL_QUADS);
             glVertex2i(0 + xo + 1, 0 + yo + 1);
-            glVertex2i(0 + xo + 1, yo + mapS - 1);
-            glVertex2i(xo + mapS - 1, yo + mapS -1);
-            glVertex2i(xo + mapS - 1, 0 + yo + 1);
+            glVertex2i(0 + xo + 1, mapS + yo - 1);
+            glVertex2i(mapS + xo - 1, mapS + yo -1);
+            glVertex2i(mapS + xo - 1, 0 + yo + 1);
             glEnd();
         }
     }
@@ -300,7 +300,7 @@ void drawRays2D()
         //---Check Vertical Lines---
         dof = 0;
         side = 0;
-        disV = 1000000;
+        disV = 100000;
         float rayTan = tan(degToRad(rayAngle));
 
         // looking left
@@ -308,7 +308,7 @@ void drawRays2D()
         {
             rx = (((int)playerX>>6)<<6)+64;
             ry = (playerX - rx) * rayTan + playerY;
-            xo = -64;
+            xo = 64;
             yo = -xo * rayTan;
         }
 
@@ -353,7 +353,7 @@ void drawRays2D()
  
         //---Check Horizontal Lines---
         dof = 0;
-        disH = 1000000;
+        disH = 100000;
         rayTan = 1.0/rayTan;
 
         // looking up
