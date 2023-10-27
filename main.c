@@ -34,6 +34,7 @@ ButtonKeys Keys;
 
 float playerX, playerY, playerDeltaX, playerDeltaY, playerAngle;
 float frame1, frame2, fps;
+int gameState = 0, timer = 0;
 
 //----------------Map----------------------------------------------------------
 #define mapX 8 // map width
@@ -47,11 +48,11 @@ int mapW[] =
 {
     1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,1,
-    1,0,1,0,0,0,0,1,
-    1,0,0,0,0,0,0,1,
+    1,0,1,0,1,1,4,1,
     1,1,1,1,1,0,0,1,
-    1,0,0,0,1,0,0,1,
-    1,0,0,0,4,0,0,1,
+    1,0,0,0,0,0,0,1,
+    1,0,0,1,0,1,0,1,
+    1,0,0,0,0,1,0,1,
     1,1,1,1,1,1,1,1,
 }; 
 
@@ -60,7 +61,7 @@ int mapF[] =
 {
     1,1,1,1,1,1,1,1,
     1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,
+    1,2,1,1,1,1,1,1,
     1,1,1,1,1,1,1,1,  
     1,1,1,1,1,1,1,1,
     1,1,1,1,1,1,1,1,
@@ -72,14 +73,102 @@ int mapF[] =
 int mapC[] =
 {
     0,0,0,0,0,0,0,0,
+    0,1,1,1,1,1,1,0,
+    0,1,0,1,0,0,1,0,
     0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,
-    0,2,2,2,0,0,0,0,
-    0,2,2,2,2,0,0,0,
     0,0,0,0,0,0,0,0, 
 };
+
+typedef struct
+{
+    int type; // static, key, enemy
+    int state; // on off
+    int map; // texture to show
+    float x, y, z; // position
+}sprite;
+sprite sp[4];
+
+int depth[120];
+
+void drawSprite()
+{
+    int x, y, s;
+    // pick up key
+    if(playerX < sp[0].x + 30 && playerX > sp[0].x - 30 && playerY < sp[0].y + 30 && playerY > sp[0].y - 30)
+    {
+        sp[0].state = 0;
+    }
+
+    // enemy kills
+    if(playerX < sp[1].x + 30 && playerX > sp[1].x - 30 && playerY < sp[1].y + 30 && playerY > sp[1].y - 30)
+    {
+        gameState = 0;
+    }
+
+    // enemy attacks
+    int spx = (int)sp[1].x >> 6, spy = (int)sp[1].y >> 6;
+    int spxAdd = ((int)sp[1].x + 15) >> 6, spyAdd = ((int)sp[1].y + 15) >> 6;
+    int spxSub = ((int)sp[1].x - 15) >> 6, spySub = ((int)sp[1].y - 15) >> 6;
+
+    if(sp[1].x > playerX && mapW[spy * 8 + spxSub] == 0){ sp[1].x -= 0.03 * fps; }
+    if(sp[1].x < playerX && mapW[spy * 8 + spxAdd] == 0){ sp[1].x += 0.03 * fps; }
+    if(sp[1].y > playerY && mapW[spySub * 8 + spx] == 0){ sp[1].y -= 0.03 * fps; }
+    if(sp[1].y < playerY && mapW[spyAdd * 8 + spx] == 0){ sp[1].y += 0.03 * fps; }
+    
+
+    for(s = 0; s < 2; s++)
+    {
+        float sx = sp[s].x - playerX; // temp float vars
+        float sy = sp[s].y - playerY;
+        float sz = sp[s].z;
+
+        float CS = cos(degToRad(playerAngle)), SN = sin(degToRad(playerAngle)); // rotate around origin
+        float a = sy * CS + sx * SN;
+        float b = sx * CS - sy * SN;
+        sx = a;
+        sy = b;
+
+        sx = (sx * 108.0 / sy) + (120 / 2); // convert to screen x, y
+        sy = (sz * 108.0 / sy) + (80 / 2);
+
+        int scale = 32 * 80 / b;
+        if(scale < 0){ scale = 0; }
+        if(scale > 120){ scale = 120; }
+        
+        // texture
+        float t_x = 0, t_y = 31, t_x_step = 31.5 / (float)scale, t_y_step = 32.0 / (float)scale;
+
+
+        for(x = sx - scale / 2; x < sx + scale / 2; x++)
+        {
+            t_y = 31;
+            for(y = 0; y < scale; y++)
+            {
+                if(sp[s].state == 1 && x > 0 && x < 120 && b < depth[x])
+                {
+                    int pixel = ((int)t_y * 32 + (int)t_x) * 3 + (sp[s].map * 32 * 32 * 3);
+                    int red = sprites[pixel + 0];
+                    int green = sprites[pixel + 1];
+                    int blue = sprites[pixel + 2];
+                    if(red != 255 && green != 0 && blue != 255)
+                    {
+                        glPointSize(8);
+                        glColor3ub(red, green, blue);
+                        glBegin(GL_POINTS);
+                        glVertex2i(x * 8, sy * 8 - y * 8);
+                        glEnd();
+                    }
+                    t_y -= t_y_step;
+                    if(t_y < 0){ t_y = 0; }
+                }
+            }
+            t_x += t_x_step;
+        }
+    }
+}
 
 //----------------Player-------------------------------------------------------
 void drawPlayer2D()
@@ -247,6 +336,8 @@ void drawRays2D()
         }
         int lineOff = 320- (lineH >> 1);
 
+        depth[ray] = disH; // save this ray's depth
+        //---Draw walls---
         int y;
         float ty = ty_off * ty_step; // + hmt * 32;
         float tx;
@@ -333,7 +424,7 @@ void ButtonDown(unsigned char key, int x, int y)
     if(key=='d'){ Keys.d=1;}
     if(key=='w'){ Keys.w=1;}
     if(key=='s'){ Keys.s=1;}
-    if(key=='e')
+    if(key=='e' && sp[0].state == 0)
     {
         int xOffset = 0;
         if(playerDeltaX < 0){ xOffset = -25; } else { xOffset = 25; }
@@ -393,6 +484,47 @@ void drawSky()
     }
 }
 
+void blackScreen()
+{
+    int x, y;
+    for(y = 0; y < 80; y++)
+    {
+        for(x = 0; x < 120; x++)
+        {
+            glPointSize(8);
+            glColor3ub(tan(timer * x), timer * y, tan(timer * y));
+            glBegin(GL_POINTS);
+            glVertex2i(x * 8, y * 8);
+            glEnd();
+        }
+    }
+}
+
+void init()
+{
+    glClearColor(0.3, 0.3, 0.3, 0);
+    playerX = 150;
+    playerY = 400;
+    playerAngle = 90;
+    playerDeltaX = cos(degToRad(playerAngle));
+    playerDeltaY = sin(degToRad(playerAngle));
+    mapW[22] = 4; // close the door
+    
+    sp[0].type = 1;
+    sp[0].state = 1;
+    sp[0].map = 1;
+    sp[0].x = 6.5 * 64;
+    sp[0].y = 6.5 * 64;
+    sp[0].z = 20;
+
+    sp[1].type = 3;
+    sp[1].state = 1;
+    sp[1].map = 0;
+    sp[1].x = 4 * 64;
+    sp[1].y = 1.5 * 64;
+    sp[1].z = 20;
+}
+
 void display()
 {
     // flames per second
@@ -400,103 +532,124 @@ void display()
     fps = (frame2 - frame1);
     frame1 = glutGet(GLUT_ELAPSED_TIME);
     
-    // buttons
-    if(Keys.a==1)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // init game
+    if(gameState == 0)
     {
-        playerAngle += 0.2 * fps;
-        playerAngle = fixAng(playerAngle);
-        playerDeltaX = cos(degToRad(playerAngle));
-        playerDeltaY = -sin(degToRad(playerAngle));
+        init();
+        timer = 0;
+        gameState = 1;
     }
 
-    if(Keys.d==1)
+    if(gameState == 1)
     {
-        playerAngle -= 0.2 * fps;
-        playerAngle = fixAng(playerAngle);
-        playerDeltaX = cos(degToRad(playerAngle));
-        playerDeltaY = -sin(degToRad(playerAngle));
-    }
-
-    // x offset to check map
-    int xOffset = 0;
-    if(playerDeltaX < 0)
-    {
-        xOffset = -20;
-    } else
-    {
-        xOffset = 20;
-    }
-
-    // y offset to check map
-    int yOffset = 0;
-    if(playerDeltaY < 0)
-    {
-        yOffset = -20;
-    } else
-    {
-        yOffset = 20;
-    }
-
-    // x position and offset
-    int iPosX = playerX / 64.0;
-    int iPosXAddXOffset = (playerX + xOffset) / 64.0;
-    int iPosXSubXOffset = (playerX - xOffset) / 64.0;
-
-    // y position and offset
-    int iPosY = playerY / 64.0;
-    int iPosYAddYOffset = (playerY + yOffset) / 64.0;
-    int iPosYSubYOffset = (playerY - yOffset) / 64.0;
-
-    if(Keys.w==1)
-    {
-        if(mapW[iPosY * mapX + iPosXAddXOffset] == 0)
+        blackScreen();
+        timer += 1 * fps;
+        if(timer > 3000)
         {
-            playerX += playerDeltaX * 0.2 * fps;
-        }
-        if(mapW[iPosYAddYOffset * mapX + iPosX] == 0)
-        {
-            playerY += playerDeltaY * 0.2 * fps;
+            timer = 0;
+            gameState = 2;
         }
     }
 
-    if(Keys.s==1)
+    if(gameState == 2)
     {
-        if(mapW[iPosY * mapX + iPosXSubXOffset] == 0)
+        // buttons
+        if(Keys.a==1)
         {
-            playerX -= playerDeltaX * 0.2 * fps;
+            playerAngle += 0.2 * fps;
+            playerAngle = fixAng(playerAngle);
+            playerDeltaX = cos(degToRad(playerAngle));
+            playerDeltaY = -sin(degToRad(playerAngle));
         }
-        if(mapW[iPosYSubYOffset * mapX + iPosX] == 0)
+
+        if(Keys.d==1)
         {
-            playerY -= playerDeltaY * 0.2 * fps;
+            playerAngle -= 0.2 * fps;
+            playerAngle = fixAng(playerAngle);
+            playerDeltaX = cos(degToRad(playerAngle));
+            playerDeltaY = -sin(degToRad(playerAngle));
         }
+
+        // x offset to check map
+        int xOffset = 0;
+        if(playerDeltaX < 0)
+        {
+            xOffset = -20;
+        } else
+        {
+            xOffset = 20;
+        }
+
+        // y offset to check map
+        int yOffset = 0;
+        if(playerDeltaY < 0)
+        {
+            yOffset = -20;
+        } else
+        {
+            yOffset = 20;
+        }
+
+        // x position and offset
+        int iPosX = playerX / 64.0;
+        int iPosXAddXOffset = (playerX + xOffset) / 64.0;
+        int iPosXSubXOffset = (playerX - xOffset) / 64.0;
+
+        // y position and offset
+        int iPosY = playerY / 64.0;
+        int iPosYAddYOffset = (playerY + yOffset) / 64.0;
+        int iPosYSubYOffset = (playerY - yOffset) / 64.0;
+
+        if(Keys.w==1)
+        {
+            if(mapW[iPosY * mapX + iPosXAddXOffset] == 0)
+            {
+                playerX += playerDeltaX * 0.2 * fps;
+            }
+            if(mapW[iPosYAddYOffset * mapX + iPosX] == 0)
+            {
+                playerY += playerDeltaY * 0.2 * fps;
+            }
+        }
+
+        if(Keys.s==1)
+        {
+            if(mapW[iPosY * mapX + iPosXSubXOffset] == 0)
+            {
+                playerX -= playerDeltaX * 0.2 * fps;
+            }
+            if(mapW[iPosYSubYOffset * mapX + iPosX] == 0)
+            {
+                playerY -= playerDeltaY * 0.2 * fps;
+            }
+        }
+
+    drawSky();
+    drawRays2D();
+    drawSprite();
+
+    if((int)playerX >> 6 == 1 && (int)playerY >> 6 == 2)
+    {
+        gameState = 0;
+    }
     }
 
     glutPostRedisplay();
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    drawSky();
-    drawRays2D();
     glutSwapBuffers();
 }
 
-void init()
-{
-    glClearColor(0.3, 0.3, 0.3, 0);
-    gluOrtho2D(0, 960, 640, 0);
-    playerX = 150;
-    playerY = 400;
-    playerAngle = 90;
-    playerDeltaX = cos(degToRad(playerAngle));
-    playerDeltaY = sin(degToRad(playerAngle));
-}
 
 int main(int argc, char* argv[])
 {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(960, 640);
-    glutInitWindowPosition(glutGet(GLUT_SCREEN_WIDTH) / 2 - 960 / 2, glutGet(GLUT_SCREEN_HEIGHT) / 2 - 640 / 2);
+    //glutInitWindowPosition(glutGet(GLUT_SCREEN_WIDTH) / 2 - 960 / 2, glutGet(GLUT_SCREEN_HEIGHT) / 2 - 640 / 2);
+    glutInitWindowPosition(200, 2000);
     glutCreateWindow("");
+    gluOrtho2D(0, 960, 640, 0);
     init();
     glutDisplayFunc(display);
     glutReshapeFunc(resize);
