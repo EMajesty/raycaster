@@ -1,6 +1,6 @@
 # Raycaster
 
-![video](raycaster.webm)
+![video](raycaster.gif)
 
 Based on tutorials by [3DSage](https://www.youtube.com/@3DSage)
 
